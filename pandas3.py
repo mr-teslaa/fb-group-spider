@@ -18,11 +18,15 @@ search_keyword = 'youtube promotion'
 leads_count = 0
 
 # HOW MANY LEAD YOU WANT TO GET
-target_leads = 1000  
+target_leads = 10
 
 # xpaths
 group_details_xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "xk50ysn", " " )) and contains(concat( " ", @class, " " ), concat( " ", "x17z8epw", " " ))] | //*[contains(concat( " ", @class, " " ), concat( " ", "x1yc453h", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "xk50ysn", " " ))]'
-members_xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "xt0b8zv", " " )) and contains(concat( " ", @class, " " ), concat( " ", "xi81zsa", " " ))]'
+members_xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "xh8yej3", " " )) and (((count(preceding-sibling::*) + 1) = 2) and parent::*)]//*[contains(concat( " ", @class, " " ), concat( " ", "xo1l8bm", " " )) and contains(concat( " ", @class, " " ), concat( " ", "xzsf02u", " " ))]'
+las_week_members = '//*[contains(concat( " ", @class, " " ), concat( " ", "x14l7nz5", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "x1xmf6yo", " " ))]//*+[contains(concat( " ", @class, " " ), concat( " ", "xh8yej3", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "xh8yej3", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "xi81zsa", " " ))]'
+today_post = '//*[contains(concat( " ", @class, " " ), concat( " ", "x16tdsg8", " " )) and (((count(preceding-sibling::*) + 1) = 1) and parent::*)]//*[contains(concat( " ", @class, " " ), concat( " ", "xo1l8bm", " " )) and contains(concat( " ", @class, " " ), concat( " ", "xzsf02u", " " ))]'
+last_month_post = '//*[contains(concat( " ", @class, " " ), concat( " ", "x16tdsg8", " " )) and (((count(preceding-sibling::*) + 1) = 1) and parent::*)]//*[contains(concat( " ", @class, " " ), concat( " ", "xi81zsa", " " )) and contains(concat( " ", @class, " " ), concat( " ", "x1yc453h", " " ))]'
+created_at = '//*[contains(concat( " ", @class, " " ), concat( " ", "x14l7nz5", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "x1xmf6yo", " " ))]//*~[contains(concat( " ", @class, " " ), concat( " ", "xh8yej3", " " ))]//*+[contains(concat( " ", @class, " " ), concat( " ", "xh8yej3", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "xh8yej3", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "x1yc453h", " " ))]'
 
 # configure driver
 service = Service(executable_path='C:/Hossain Foysal/Software/chromedriver-win64/chromedriver.exe')
@@ -54,13 +58,36 @@ time.sleep(2)
 # END - LOGIN
 
 # START - SEARCH BAR - go to search bar and type the keyword
-group_search_url = f"https://www.facebook.com/search/groups?q={search_keyword}"
+group_search_url = f"https://www.facebook.com/search/groups?q={search_keyword}&filters=eyJmaWx0ZXJfZ3JvdXBzX2xvY2F0aW9uOjAiOiJ7XCJuYW1lXCI6XCJmaWx0ZXJfZ3JvdXBzX2xvY2F0aW9uXCIsXCJhcmdzXCI6XCIxMDE4ODk1ODY1MTkzMDFcIn0ifQ%3D%3D"
 driver.get(group_search_url)
 time.sleep(5)
 # END - SEARCH BAR
 
-# Load existing data from CSV file
-existing_data = pd.read_csv('facebook_groups_data.csv') if os.path.exists('facebook_groups_data.csv') else pd.DataFrame()
+# Load existing data from Excel file
+excel_file_name = f"{search_keyword}_facebook_groups_dataset.xlsx"
+# Create Excel file if it doesn't exist
+excel_file_name = f"{search_keyword}_facebook_groups_dataset.xlsx"
+if not os.path.exists(excel_file_name):
+    with pd.ExcelWriter(excel_file_name, mode='w', engine='openpyxl') as writer:
+        pd.DataFrame().to_excel(writer, index=False)
+
+# Load existing data from Excel file
+existing_data = pd.read_excel(excel_file_name)
+
+# Function to check if the Excel file exists
+def excel_file_exists(file_path):
+    return os.path.exists(file_path)
+
+# Function to write data to Excel
+def write_to_excel(data, file_path):
+    # If file exists, load the existing data and append new data
+    if excel_file_exists(file_path):
+        existing_data = pd.read_excel(file_path)
+        updated_data = pd.concat([existing_data, data], ignore_index=True)
+        updated_data.to_excel(file_path, index=False)
+    else:
+        # If file does not exist, write new data to Excel
+        data.to_excel(file_path, index=False)
 
 #   GET CLEAN GROUP LINK
 def extract_clean_group_links(anchors):
@@ -123,6 +150,9 @@ def scroll_to_get_group():
         # Get the number of group members
         group_members_element = driver.find_element(By.XPATH, members_xpath)
         number_of_members = group_members_element.text.strip()
+        last_week_members_ = driver.find_element(By.XPATH, las_week_members)
+        lwm = last_week_members_.text.strip()
+        print('---////---> LAST WEEK MEMBER: ', lwm)
 
         # Convert group members to integer (removing "K" or "M" if present)
         # if 'K' in number_of_members:
@@ -152,6 +182,7 @@ def scroll_to_get_group():
 
         # Add group details to list
         group_data.append({
+            "Search Keyword": search_keyword,
             "Group Name": group_details_about.get("Group Name", "Not available"),
             "Group URL": group_url,
             "Group Status": group_details_about.get("Group Status", "Not available"),
@@ -165,9 +196,14 @@ def scroll_to_get_group():
         leads_count += 1
         print('Lead no -> ', leads_count)
         
-        # Save group data to CSV
+        # Save group data to Excel
         df = pd.DataFrame([group_data[-1]])
-        df.to_csv('facebook_groups_data.csv', mode='a', header=not os.path.exists('facebook_groups_data.csv'), index=False)
+        # with pd.ExcelWriter(excel_file_name, mode='a', engine='openpyxl') as writer:
+        #     df.to_excel(writer, index=False, header=not os.path.exists(excel_file_name), sheet_name='Groups')
+        if not excel_file_exists(excel_file_name):
+            with pd.ExcelWriter(excel_file_name, mode='w', engine='openpyxl') as writer:
+                pd.DataFrame().to_excel(writer, index=False)
+
 
         print("Group Name:", group_data[-1].get("Group Name", "Not available"))
         print("Group URL:", group_url)

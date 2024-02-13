@@ -17,7 +17,8 @@ load_dotenv(find_dotenv())
 # xpaths
 ########################################
 group_details_xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "xk50ysn", " " )) and contains(concat( " ", @class, " " ), concat( " ", "x17z8epw", " " ))] | //*[contains(concat( " ", @class, " " ), concat( " ", "x1yc453h", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "xk50ysn", " " ))]'
-members_xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "xh8yej3", " " )) and (((count(preceding-sibling::*) + 1) = 2) and parent::*)]//*[contains(concat( " ", @class, " " ), concat( " ", "xo1l8bm", " " )) and contains(concat( " ", @class, " " ), concat( " ", "xzsf02u", " " ))]'
+# members_xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "xh8yej3", " " )) and (((count(preceding-sibling::*) + 1) = 2) and parent::*)]//*[contains(concat( " ", @class, " " ), concat( " ", "xo1l8bm", " " )) and contains(concat( " ", @class, " " ), concat( " ", "xzsf02u", " " ))]'
+members_xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "x14l7nz5", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "x1xmf6yo", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "xh8yej3", " " )) and (((count(preceding-sibling::*) + 1) = 2) and parent::*)]//*[contains(concat( " ", @class, " " ), concat( " ", "xzsf02u", " " ))]'
 las_week_members_xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "x14l7nz5", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "x1xmf6yo", " " ))]//*+[contains(concat( " ", @class, " " ), concat( " ", "xh8yej3", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "xh8yej3", " " ))]//*[contains(concat( " ", @class, " " ), concat( " ", "xi81zsa", " " ))]'
 today_post_xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "x16tdsg8", " " )) and (((count(preceding-sibling::*) + 1) = 1) and parent::*)]//*[contains(concat( " ", @class, " " ), concat( " ", "xo1l8bm", " " )) and contains(concat( " ", @class, " " ), concat( " ", "xzsf02u", " " ))]'
 last_month_post_xpath = '//*[contains(concat( " ", @class, " " ), concat( " ", "x16tdsg8", " " )) and (((count(preceding-sibling::*) + 1) = 1) and parent::*)]//*[contains(concat( " ", @class, " " ), concat( " ", "xi81zsa", " " )) and contains(concat( " ", @class, " " ), concat( " ", "x1yc453h", " " ))]'
@@ -44,7 +45,6 @@ def extract_creation_date(description):
     
     return creation_date
 
-
 # Function to check if the Excel file exists
 def excel_file_exists(file_path):
     return os.path.exists(file_path)
@@ -60,15 +60,28 @@ def write_to_excel(data, file_path):
         # If file does not exist, write new data to Excel
         data.to_excel(file_path, index=False)
 
+# Load existing URLs from Excel
+def load_existing_urls_from_excel(excel_file):
+    df = pd.read_excel(excel_file)
+    print('---->>> checking excel file already had the group url or not ...')
+    print(df)
+    print('---->>> -------------------------------------.....')
+    return df['Group URL'].tolist()
+
 # Function to extract clean group links from anchor tags
-def extract_clean_group_links(anchors):
+def extract_clean_group_links(anchors, existing_urls):
     clean_group_links = []
     for a in anchors:
         if a.startswith("https://www.facebook.com/groups"):
             parsed_url = urlparse(a)
             clean_url = parsed_url.scheme + "://" + parsed_url.netloc + parsed_url.path
+            
             if clean_url == 'https://www.facebook.com/groups/':
                 continue
+
+            if clean_url not in existing_urls:
+                clean_group_links.append(clean_url)
+
             clean_group_links.append(clean_url)
     # Remove duplicate links
     clean_group_links = list(set(clean_group_links))
@@ -94,12 +107,22 @@ def get_group_details(driver, group_details_xpath):
     return group_details
 
 # Function to scroll and get groups
-def scroll_to_get_group(driver, group_details_xpath, members_xpath, search_keyword):
+def scroll_to_get_group(driver, group_details_xpath, members_xpath, search_keyword, excel_file):
     anchors = driver.find_elements(By.TAG_NAME, 'a')
     anchors = [a.get_attribute('href') for a in anchors]
-    clean_group_links = extract_clean_group_links(anchors)
+
+    # extract the excel url 
+    existing_urls = load_existing_urls_from_excel(excel_file)
+    clean_group_links = extract_clean_group_links(anchors, existing_urls)
     group_data = []
     for group_url in clean_group_links:
+        
+        # checking if our group link already exist in excel file
+        if group_url in existing_urls:
+            print('Group already in excel file. Skipping..')
+            continue
+
+        # if group url not exist in excel file then continue further process
         driver.execute_script("window.open('');")
         driver.switch_to.window(driver.window_handles[1])
         driver.get(group_url + 'about/')
@@ -122,7 +145,7 @@ def scroll_to_get_group(driver, group_details_xpath, members_xpath, search_keywo
             "Location": group_details_about.get("Location", "Not available"),
             "Members": group_members,
             # "Last Week Joined Members": las_week_members,
-            "Today\'s Post": today_post,
+            "Today\'s Post": today_post if today_post else 0,
             # "Last Month Joined People": last_month_post,
             # "Group Created At": extract_creation_date(created_at),
         })
@@ -136,7 +159,10 @@ def scroll_to_get_group(driver, group_details_xpath, members_xpath, search_keywo
         print("Group URL:", group_url)
         print("Group Status:", group_data[-1].get("Group Status", "Not available"))
         print("-" * 20)
+
+        time.sleep(2)
         driver.close()
+        time.sleep(2)
         driver.switch_to.window(driver.window_handles[0])
 
 # Main function
@@ -176,7 +202,8 @@ def main():
 
     # Scroll and collect group data
     while True:
-        scroll_to_get_group(driver, group_details_xpath, members_xpath, search_keyword=search_keyword)
+        scroll_to_get_group(driver, group_details_xpath, members_xpath, search_keyword=search_keyword, excel_file=excel_file_name)
+        time.sleep(2)
         for _ in range(5):
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(2)
