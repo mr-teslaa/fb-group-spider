@@ -116,7 +116,17 @@ def scroll_to_get_group(driver, group_details_xpath, members_xpath, search_keywo
     clean_group_links = extract_clean_group_links(anchors, existing_urls)
     group_data = []
     for group_url in clean_group_links:
-        
+        print('--->>> gropu url -> ', group_url)
+
+        # Checking if the URL contains "/posts/", if so, skip processing
+        if "/posts/" in group_url:
+            print('Skipping URL containing "/posts/":', group_url)
+            continue
+
+        if "/create/" in group_url:
+            print('Skipping URL containing "/posts/":', group_url)
+            continue
+
         # checking if our group link already exist in excel file
         if group_url in existing_urls:
             print('Group already in excel file. Skipping..')
@@ -203,10 +213,10 @@ def main():
     # Scroll and collect group data
     while True:
         scroll_to_get_group(driver, group_details_xpath, members_xpath, search_keyword=search_keyword, excel_file=excel_file_name)
-        time.sleep(2)
-        for _ in range(5):
+        time.sleep(5)
+        for _ in range(100):
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(2)
+            time.sleep(5)
         if len(pd.read_excel(excel_file_name)) >= target_leads:
             break
 

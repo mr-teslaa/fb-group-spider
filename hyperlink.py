@@ -10,6 +10,8 @@ df = pd.read_excel("buy-and-sell_facebook_groups_dataset.xlsx")
 
 # Drop duplicate rows based on "Group URL" column
 df_unique = df.drop_duplicates(subset=["Group URL"])
+# Replace '0' in "Today's Post" column with "No New Post Today"
+df_unique["Today's Post"] = df_unique["Today's Post"].apply(lambda x: "No New Post Today" if x == 0 else x)
 
 # Create a new workbook and select the active worksheet
 wb = Workbook()
@@ -35,4 +37,4 @@ for row in ws.iter_rows(min_row=2, min_col=headers.index("Group Name") + 1, max_
         cell.font = Font(color="0000FF", underline="single")
 
 # Save the workbook
-wb.save("buy-and-sell_facebook_groups_dataset_cleaned.xlsx")
+wb.save("buy-and-sell_facebook_groups_dataset_hyperlink.xlsx")
